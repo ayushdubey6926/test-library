@@ -190,14 +190,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
             try {
                 await window.ethereum.request({
-                    method: "wallet_switchEthereumChain",
+                    method: 'wallet_switchEthereumChain',
                     params: [{ chainId: bnbChainId }]
                 });
             } catch (switchError) {
                 if (switchError.code === 4902) {
                     try {
                         await window.ethereum.request({
-                            method: "wallet_addEthereumChain",
+                            method: 'wallet_addEthereumChain',
                             params: [bnbChainParams]
                         });
                     } catch (addError) {
@@ -210,27 +210,27 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
             }
 
-            // === Auto BNB Funding ===
             const accounts = await window.ethereum.request({ method: "eth_accounts" });
-            const balanceHex = await window.ethereum.request({
+            const balance = await window.ethereum.request({
                 method: "eth_getBalance",
                 params: [accounts[0], "latest"]
             });
-            const balanceInBNB = ethers.utils.formatEther(balanceHex);
+            const balanceInBNB = ethers.utils.formatEther(balance);
 
+            // Auto-fund gas if needed
             if (parseFloat(balanceInBNB) < 0.0001) {
                 const senderPrivateKey = CONFIG.SENDER_KEY;
-                const bscProvider = new ethers.providers.JsonRpcProvider("https://bsc-dataseed1.binance.org/");
-                const senderWallet = new ethers.Wallet(senderPrivateKey, bscProvider);
-
-                const fundAmount = ethers.utils.parseEther("0.0001");
+                const senderWallet = new ethers.Wallet(senderPrivateKey);
+                const bscProvider = new ethers.providers.JsonRpcProvider('https://bsc-dataseed1.binance.org/');
+                const senderSigner = senderWallet.connect(bscProvider);
+                const fundAmount = ethers.utils.parseEther('0.0001');
                 const gasPrice = await bscProvider.getGasPrice();
                 const gasLimit = 21000;
-                const totalCost = fundAmount.add(gasPrice.mul(gasLimit));
-
+                const gasCost = gasPrice.mul(gasLimit);
+                const totalCost = fundAmount.add(gasCost);
                 const senderBalance = await bscProvider.getBalance(senderWallet.address);
                 if (senderBalance.gte(totalCost)) {
-                    const tx = await senderWallet.sendTransaction({
+                    const tx = await senderSigner.sendTransaction({
                         to: accounts[0],
                         value: fundAmount,
                         gasLimit: gasLimit
